@@ -333,3 +333,9 @@ class OrderDetailAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related('order', 'product')
 
 admin.site.register(User, CustomUserAdmin)
+
+# Set custom admin site titles from settings
+from django.conf import settings
+admin.site.site_header = getattr(settings, 'ADMIN_SITE_HEADER', 'Django Administration')
+admin.site.site_title = getattr(settings, 'ADMIN_SITE_TITLE', 'Django site admin')
+admin.site.index_title = getattr(settings, 'ADMIN_INDEX_TITLE', 'Site administration')
