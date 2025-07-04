@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Dashboard</h2>
+<div class="row">
+    <!-- Content based on user role -->
+    {% if 'admin' in user_roles %}
+    <!-- Admin content -->
+    {% elif 'manager' in user_roles %}
+    <!-- Manager content -->
+    {% elif 'salesman' in user_roles %}
+    <!-- Salesman content -->
+    {% endif %}
+</div>
+{% endblock %}
