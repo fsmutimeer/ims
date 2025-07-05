@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.utils import timezone
-from crum import get_current_user
 
 class User(AbstractUser):
     contact_number = models.CharField(max_length=20)
