@@ -5,9 +5,9 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apt-get update && \
-    apt-get install -y build-essential && \
-    rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && \
+#     apt-get install -y build-essential && \
+#     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
 RUN pip install --upgrade pip && \
@@ -37,7 +37,7 @@ COPY .env /app/.env
 EXPOSE 8000
 
 # Set environment variables for Django (add more as needed)
-ENV DJANGO_SETTINGS_MODULE=mobile_accessories.mobile_accessories.settings \
+ENV ENV DJANGO_SETTINGS_MODULE=mobile_accessories.settings \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
