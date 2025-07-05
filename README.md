@@ -108,3 +108,38 @@ DATABASE_URL=postgres://user:password@host:5432/dbname
 ## Contact
 
 - Email: info@teknixor.com
+
+---
+
+## Native Desktop App (PyInstaller + pywebview)
+
+You can run the app as a true native desktop application (no browser, no Electron required):
+
+### 1. All dependencies are already included in your requirements file.
+
+_You do not need to install `pyinstaller` or `pywebview` manually—they are already included._
+
+### 2. Run the desktop app (for development):
+
+```sh
+python desktop.py
+```
+
+### 3. Build a standalone executable (for distribution):
+
+```sh
+pyinstaller --onefile --noconsole desktop.py
+```
+
+- The output will be in the `dist/` folder as `desktop.exe` (Windows) or just `desktop` (Mac/Linux).
+- Distribute this file to your users—they just double-click to run the app.
+
+### 4. (Optional) Custom icon:
+
+Add `--icon=icon.ico` to the PyInstaller command for a custom app icon.
+
+---
+
+## Do I need the electron-desktop folder?
+
+**No.** If you are using the native desktop app approach (PyInstaller + pywebview), you do NOT need the `electron-desktop` folder. You can safely delete it to keep your project clean.
