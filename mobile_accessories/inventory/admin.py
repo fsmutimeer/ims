@@ -365,30 +365,98 @@ admin.site.index_title = getattr(settings, 'ADMIN_INDEX_TITLE', 'Site administra
 
 @staff_member_required
 def admin_dashboard_charts(request):
-    # Orders per month (last 6 months)
+    from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
     now = timezone.now()
-    six_months_ago = now - datetime.timedelta(days=180)
-    months = []
-    sales = []
+    orders_range = request.GET.get('orders_range', 'month')
+    mode = request.GET.get('mode', 'month')
+
+    # Orders by selectable range
+    if orders_range == 'week':
+        start = now - datetime.timedelta(weeks=12)
+        trunc = TruncWeek('order_date')
+        label_fmt = '%W %b %Y'
+    elif orders_range == 'year':
+        start = now - datetime.timedelta(days=365*5)
+        trunc = TruncYear('order_date')
+        label_fmt = '%Y'
+    elif orders_range == 'all':
+        start = Order.objects.earliest('order_date').order_date if Order.objects.exists() else now
+        trunc = TruncYear('order_date')
+        label_fmt = '%Y'
+    else:  # month (last 6 months)
+        start = now - datetime.timedelta(days=180)
+        trunc = TruncMonth('order_date')
+        label_fmt = '%b %Y'
     qs = (
-        Order.objects.filter(order_date__gte=six_months_ago)
-        .annotate(month=TruncMonth('order_date'))
-        .values('month')
+        Order.objects.filter(order_date__gte=start)
+        .annotate(period=trunc)
+        .values('period')
         .annotate(total=Count('id'))
-        .order_by('month')
+        .order_by('period')
     )
-    for group in qs:
-        months.append(group['month'].strftime('%b %Y'))
-        sales.append(group['total'])
-    # Products per category
+    orders_by_labels = [g['period'].strftime(label_fmt) for g in qs]
+    orders_by_data = [g['total'] for g in qs]
+
+    # Products by category (pie)
     cat_labels = []
     cat_counts = []
     for c in Category.objects.annotate(num=Count('product')).order_by('-num'):
         cat_labels.append(c.name)
         cat_counts.append(c.num)
+
+    # Products added by month (bar)
+    prod_months = []
+    prod_counts = []
+    prod_qs = (
+        Product.objects.filter(created_at__gte=now - datetime.timedelta(days=365))
+        .annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(total=Count('id'))
+        .order_by('month')
+    )
+    for g in prod_qs:
+        prod_months.append(g['month'].strftime('%b %Y'))
+        prod_counts.append(g['total'])
+
+    # Orders vs Products (comparison line)
+    if mode == 'week':
+        trunc_cmp = TruncWeek('order_date')
+        trunc_cmp_prod = TruncWeek('created_at')
+        label_fmt_cmp = '%W %b %Y'
+        cmp_start = now - datetime.timedelta(weeks=12)
+    else:
+        trunc_cmp = TruncMonth('order_date')
+        trunc_cmp_prod = TruncMonth('created_at')
+        label_fmt_cmp = '%b %Y'
+        cmp_start = now - datetime.timedelta(days=180)
+    # Orders for comparison
+    cmp_orders = (
+        Order.objects.filter(order_date__gte=cmp_start)
+        .annotate(period=trunc_cmp)
+        .values('period')
+        .annotate(total=Count('id'))
+        .order_by('period')
+    )
+    cmp_labels = [g['period'].strftime(label_fmt_cmp) for g in cmp_orders]
+    cmp_orders_data = [g['total'] for g in cmp_orders]
+    # Products for comparison (by created_at)
+    cmp_products = (
+        Product.objects.filter(created_at__gte=cmp_start)
+        .annotate(period=trunc_cmp_prod)
+        .values('period')
+        .annotate(total=Count('id'))
+        .order_by('period')
+    )
+    cmp_products_data = []
+    cmp_products_dict = {g['period'].strftime(label_fmt_cmp): g['total'] for g in cmp_products}
+    for label in cmp_labels:
+        cmp_products_data.append(cmp_products_dict.get(label, 0))
+
     return JsonResponse({
-        'orders_by_month': {'labels': months, 'data': sales},
+        'orders_by': {'labels': orders_by_labels, 'data': orders_by_data},
         'products_by_category': {'labels': cat_labels, 'data': cat_counts},
+        'products_by_month': {'labels': prod_months, 'data': prod_counts},
+        'orders_vs_products': {'labels': cmp_labels, 'orders': cmp_orders_data, 'products': cmp_products_data},
     })
 
 # Patch admin URLs to add chart endpoint

@@ -104,12 +104,27 @@
 <div class="dashboard-graphs" style="margin-bottom:2em;">
     <div style="display:flex;gap:2em;flex-wrap:wrap;justify-content:center;">
         <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
-            <h3>Orders by Month (Last 6 Months)</h3>
-            <canvas id="ordersByMonthChart" width="520" height="340"></canvas>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5em;">
+                <h3 style="margin:0;">Orders by <span id="ordersByLabel">Month (Last 6 Months)</span></h3>
+                <div>
+                    <label style="font-size:1.1em;">View:&nbsp;</label>
+                    <select id="ordersByRange" style="font-size:1.1em;padding:4px 10px;">
+                        <option value="week">Week</option>
+                        <option value="month" selected>Month (Last 6 Months)</option>
+                        <option value="year">Year</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="ordersByChart" width="520" height="340"></canvas>
         </div>
         <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
             <h3>Products by Category</h3>
             <canvas id="productsByCategoryChart" width="520" height="340"></canvas>
+        </div>
+        <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
+            <h3>Products Added by Month</h3>
+            <canvas id="productsByMonthChart" width="520" height="340"></canvas>
         </div>
     </div>
     <div style="display:flex;justify-content:center;">
@@ -130,27 +145,35 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
 <script>
-    let ordersVsProductsChart;
-    function renderDashboardCharts(mode = 'month') {
-        fetch(`/admin/dashboard-charts/?mode=${mode}`)
+    let ordersVsProductsChart, ordersByChartObj, productsByMonthChartObj;
+    function renderDashboardCharts({ ordersRange = 'month', comparisonMode = 'month' } = {}) {
+        // Update label
+        const labelMap = {
+            week: 'Week',
+            month: 'Month (Last 6 Months)',
+            year: 'Year',
+            all: 'All Time'
+        };
+        document.getElementById('ordersByLabel').textContent = labelMap[ordersRange] || 'Month (Last 6 Months)';
+        fetch(`/admin/dashboard-charts/?orders_range=${ordersRange}&mode=${comparisonMode}`)
             .then(resp => resp.json())
             .then(data => {
-                // Orders by Month
-                const ctx1 = document.getElementById('ordersByMonthChart').getContext('2d');
-                if (window.ordersByMonthChartObj) window.ordersByMonthChartObj.destroy();
-                window.ordersByMonthChartObj = new Chart(ctx1, {
+                // Orders by (bar)
+                const ctx1 = document.getElementById('ordersByChart').getContext('2d');
+                if (ordersByChartObj) ordersByChartObj.destroy();
+                ordersByChartObj = new Chart(ctx1, {
                     type: 'bar',
                     data: {
-                        labels: data.orders_by_month.labels,
+                        labels: data.orders_by.labels,
                         datasets: [{
                             label: 'Orders',
-                            data: data.orders_by_month.data,
+                            data: data.orders_by.data,
                             backgroundColor: '#3366cc',
                         }]
                     },
                     options: { responsive: false, plugins: { legend: { display: false } } }
                 });
-                // Products by Category
+                // Products by Category (pie)
                 const ctx2 = document.getElementById('productsByCategoryChart').getContext('2d');
                 if (window.productsByCategoryChartObj) window.productsByCategoryChartObj.destroy();
                 window.productsByCategoryChartObj = new Chart(ctx2, {
@@ -167,10 +190,25 @@
                     },
                     options: { responsive: false }
                 });
-                // Orders vs Products Comparison
-                const ctx3 = document.getElementById('ordersVsProductsChart').getContext('2d');
+                // Products by Month (bar)
+                const ctx3 = document.getElementById('productsByMonthChart').getContext('2d');
+                if (productsByMonthChartObj) productsByMonthChartObj.destroy();
+                productsByMonthChartObj = new Chart(ctx3, {
+                    type: 'bar',
+                    data: {
+                        labels: data.products_by_month.labels,
+                        datasets: [{
+                            label: 'Products Added',
+                            data: data.products_by_month.data,
+                            backgroundColor: '#00cc99',
+                        }]
+                    },
+                    options: { responsive: false, plugins: { legend: { display: false } } }
+                });
+                // Orders vs Products (line)
+                const ctx4 = document.getElementById('ordersVsProductsChart').getContext('2d');
                 if (ordersVsProductsChart) ordersVsProductsChart.destroy();
-                ordersVsProductsChart = new Chart(ctx3, {
+                ordersVsProductsChart = new Chart(ctx4, {
                     type: 'line',
                     data: {
                         labels: data.orders_vs_products.labels,
@@ -198,9 +236,15 @@
             });
     }
     document.addEventListener('DOMContentLoaded', function () {
-        renderDashboardCharts();
+        let ordersRange = 'month', comparisonMode = 'month';
+        renderDashboardCharts({ ordersRange, comparisonMode });
+        document.getElementById('ordersByRange').addEventListener('change', function (e) {
+            ordersRange = e.target.value;
+            renderDashboardCharts({ ordersRange, comparisonMode });
+        });
         document.getElementById('comparisonMode').addEventListener('change', function (e) {
-            renderDashboardCharts(e.target.value);
+            comparisonMode = e.target.value;
+            renderDashboardCharts({ ordersRange, comparisonMode });
         });
     });
 </script>
