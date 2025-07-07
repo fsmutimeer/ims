@@ -347,6 +347,7 @@ def custom_admin_index(self, request, extra_context=None):
     extra_context['total_categories'] = Category.objects.count()
     extra_context['total_suppliers'] = Supplier.objects.count()
     extra_context['total_retailers'] = Retailer.objects.count()
+    extra_context['total_inventory'] = Inventory.objects.count()
     return original_admin_index(request, extra_context=extra_context)
 admin.site.index = custom_admin_index.__get__(admin.site)
 
