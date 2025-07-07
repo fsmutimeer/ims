@@ -13,21 +13,65 @@
         background: #fff;
         border-radius: 10px;
         box-shadow: 0 2px 8px #e0e0e0;
-        padding: 1.5em 2em;
-        min-width: 180px;
+        padding: 1.2em 1.2em;
+        min-width: 150px;
         text-align: center;
-        flex: 1 1 180px;
+        flex: 1 1 120px;
+        max-width: 180px;
     }
 
     .dashboard-card h2 {
         margin: 0 0 0.5em 0;
-        font-size: 2.2em;
+        font-size: 1.5em;
         color: #3366cc;
     }
 
     .dashboard-card p {
         margin: 0;
         color: #888;
+        font-size: 1em;
+    }
+
+    .dashboard-graphs {
+        display: flex;
+        gap: 1.2em;
+        flex-wrap: wrap;
+        margin-bottom: 1.5em;
+    }
+
+    .dashboard-graph {
+        flex: 1 1 260px;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px #e0e0e0;
+        padding: 1em 0.5em;
+        margin-bottom: 1.2em;
+        max-width: 340px;
+        min-width: 220px;
+    }
+
+    .dashboard-graph h3 {
+        text-align: center;
+        color: #3366cc;
+        margin-bottom: 0.7em;
+        font-size: 1.1em;
+    }
+
+    .dashboard-comparison {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px #e0e0e0;
+        padding: 1em 0.5em;
+        margin-bottom: 1.5em;
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .dashboard-comparison h3 {
+        text-align: center;
+        color: #3366cc;
+        margin-bottom: 0.7em;
         font-size: 1.1em;
     }
 </style>
@@ -57,5 +101,108 @@
         <p>Total Inventory Records</p>
     </div>
 </div>
+<div class="dashboard-graphs" style="margin-bottom:2em;">
+    <div style="display:flex;gap:2em;flex-wrap:wrap;justify-content:center;">
+        <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
+            <h3>Orders by Month (Last 6 Months)</h3>
+            <canvas id="ordersByMonthChart" width="520" height="340"></canvas>
+        </div>
+        <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
+            <h3>Products by Category</h3>
+            <canvas id="productsByCategoryChart" width="520" height="340"></canvas>
+        </div>
+    </div>
+    <div style="display:flex;justify-content:center;">
+        <div class="dashboard-graph" style="max-width:1320px;width:100%;padding:2em 1em;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5em;">
+                <h3 style="margin:0;">Orders vs Products</h3>
+                <div>
+                    <label style="font-size:1.1em;">View:&nbsp;</label>
+                    <select id="comparisonMode" style="font-size:1.1em;padding:4px 10px;">
+                        <option value="month">By Month</option>
+                        <option value="week">By Week</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="ordersVsProductsChart" width="1200" height="400"></canvas>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
+<script>
+    let ordersVsProductsChart;
+    function renderDashboardCharts(mode = 'month') {
+        fetch(`/admin/dashboard-charts/?mode=${mode}`)
+            .then(resp => resp.json())
+            .then(data => {
+                // Orders by Month
+                const ctx1 = document.getElementById('ordersByMonthChart').getContext('2d');
+                if (window.ordersByMonthChartObj) window.ordersByMonthChartObj.destroy();
+                window.ordersByMonthChartObj = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: data.orders_by_month.labels,
+                        datasets: [{
+                            label: 'Orders',
+                            data: data.orders_by_month.data,
+                            backgroundColor: '#3366cc',
+                        }]
+                    },
+                    options: { responsive: false, plugins: { legend: { display: false } } }
+                });
+                // Products by Category
+                const ctx2 = document.getElementById('productsByCategoryChart').getContext('2d');
+                if (window.productsByCategoryChartObj) window.productsByCategoryChartObj.destroy();
+                window.productsByCategoryChartObj = new Chart(ctx2, {
+                    type: 'pie',
+                    data: {
+                        labels: data.products_by_category.labels,
+                        datasets: [{
+                            label: 'Products',
+                            data: data.products_by_category.data,
+                            backgroundColor: [
+                                '#3366cc', '#00cc99', '#ffbb33', '#ff4444', '#aa66cc', '#2BBBAD', '#4285F4', '#ff8800'
+                            ],
+                        }]
+                    },
+                    options: { responsive: false }
+                });
+                // Orders vs Products Comparison
+                const ctx3 = document.getElementById('ordersVsProductsChart').getContext('2d');
+                if (ordersVsProductsChart) ordersVsProductsChart.destroy();
+                ordersVsProductsChart = new Chart(ctx3, {
+                    type: 'line',
+                    data: {
+                        labels: data.orders_vs_products.labels,
+                        datasets: [
+                            {
+                                label: 'Orders',
+                                data: data.orders_vs_products.orders,
+                                borderColor: '#3366cc',
+                                backgroundColor: 'rgba(51,102,204,0.08)',
+                                tension: 0.3,
+                                fill: true,
+                            },
+                            {
+                                label: 'Products',
+                                data: data.orders_vs_products.products,
+                                borderColor: '#00cc99',
+                                backgroundColor: 'rgba(0,204,153,0.08)',
+                                tension: 0.3,
+                                fill: true,
+                            }
+                        ]
+                    },
+                    options: { responsive: false, plugins: { legend: { position: 'top' } } }
+                });
+            });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        renderDashboardCharts();
+        document.getElementById('comparisonMode').addEventListener('change', function (e) {
+            renderDashboardCharts(e.target.value);
+        });
+    });
+</script>
 {{ block.super }}
 {% endblock %}

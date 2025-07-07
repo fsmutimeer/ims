@@ -164,6 +164,12 @@ from django.db import connection
 from django.db.models import Count
 from .models import Product, Order, Category, Supplier, Retailer
 from .models import *
+from django.http import JsonResponse
+from django.urls import path
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models.functions import TruncMonth
+from django.utils import timezone
+import datetime
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -356,3 +362,40 @@ from django.conf import settings
 admin.site.site_header = getattr(settings, 'ADMIN_SITE_HEADER', 'Django Administration')
 admin.site.site_title = getattr(settings, 'ADMIN_SITE_TITLE', 'Django site admin')
 admin.site.index_title = getattr(settings, 'ADMIN_INDEX_TITLE', 'Site administration')
+
+@staff_member_required
+def admin_dashboard_charts(request):
+    # Orders per month (last 6 months)
+    now = timezone.now()
+    six_months_ago = now - datetime.timedelta(days=180)
+    months = []
+    sales = []
+    qs = (
+        Order.objects.filter(order_date__gte=six_months_ago)
+        .annotate(month=TruncMonth('order_date'))
+        .values('month')
+        .annotate(total=Count('id'))
+        .order_by('month')
+    )
+    for group in qs:
+        months.append(group['month'].strftime('%b %Y'))
+        sales.append(group['total'])
+    # Products per category
+    cat_labels = []
+    cat_counts = []
+    for c in Category.objects.annotate(num=Count('product')).order_by('-num'):
+        cat_labels.append(c.name)
+        cat_counts.append(c.num)
+    return JsonResponse({
+        'orders_by_month': {'labels': months, 'data': sales},
+        'products_by_category': {'labels': cat_labels, 'data': cat_counts},
+    })
+
+# Patch admin URLs to add chart endpoint
+old_get_urls = admin.site.get_urls
+
+def get_urls():
+    urls = old_get_urls()
+    custom = [path('dashboard-charts/', admin_dashboard_charts, name='admin_dashboard_charts')]
+    return custom + urls
+admin.site.get_urls = get_urls
