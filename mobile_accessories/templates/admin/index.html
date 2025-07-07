@@ -128,7 +128,7 @@
         </div>
     </div>
     <div style="display:flex;justify-content:center;">
-        <div class="dashboard-graph" style="max-width:1320px;width:100%;padding:2em 1em;">
+        <div class="dashboard-graph" style="max-width:900px;width:100%;padding:1.2em 0.5em;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5em;">
                 <h3 style="margin:0;">Orders vs Products</h3>
                 <div>
@@ -139,7 +139,17 @@
                     </select>
                 </div>
             </div>
-            <canvas id="ordersVsProductsChart" width="1200" height="400"></canvas>
+            <canvas id="ordersVsProductsChart" width="800" height="320"></canvas>
+        </div>
+    </div>
+    <div style="display:flex;gap:2em;flex-wrap:wrap;justify-content:center;">
+        <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
+            <h3>Orders by Retailer (Top 5)</h3>
+            <canvas id="ordersByRetailerChart" width="520" height="340"></canvas>
+        </div>
+        <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
+            <h3>Products by Supplier (Top 5)</h3>
+            <canvas id="productsBySupplierChart" width="520" height="340"></canvas>
         </div>
     </div>
 </div>
@@ -232,6 +242,36 @@
                         ]
                     },
                     options: { responsive: false, plugins: { legend: { position: 'top' } } }
+                });
+                // Orders by Retailer (bar)
+                const ctx5 = document.getElementById('ordersByRetailerChart').getContext('2d');
+                if (window.ordersByRetailerChartObj) window.ordersByRetailerChartObj.destroy();
+                window.ordersByRetailerChartObj = new Chart(ctx5, {
+                    type: 'bar',
+                    data: {
+                        labels: data.orders_by_retailer.labels,
+                        datasets: [{
+                            label: 'Orders',
+                            data: data.orders_by_retailer.data,
+                            backgroundColor: '#4285F4',
+                        }]
+                    },
+                    options: { responsive: false, plugins: { legend: { display: false } } }
+                });
+                // Products by Supplier (bar)
+                const ctx6 = document.getElementById('productsBySupplierChart').getContext('2d');
+                if (window.productsBySupplierChartObj) window.productsBySupplierChartObj.destroy();
+                window.productsBySupplierChartObj = new Chart(ctx6, {
+                    type: 'bar',
+                    data: {
+                        labels: data.products_by_supplier.labels,
+                        datasets: [{
+                            label: 'Products',
+                            data: data.products_by_supplier.data,
+                            backgroundColor: '#ff8800',
+                        }]
+                    },
+                    options: { responsive: false, plugins: { legend: { display: false } } }
                 });
             });
     }

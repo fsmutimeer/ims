@@ -370,23 +370,51 @@ def admin_dashboard_charts(request):
     orders_range = request.GET.get('orders_range', 'month')
     mode = request.GET.get('mode', 'month')
 
+    # Helper to generate all periods in range
+    def get_periods(start, end, kind):
+        periods = []
+        cur = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if kind == 'month':
+            while cur <= end:
+                periods.append(cur)
+                if cur.month == 12:
+                    cur = cur.replace(year=cur.year+1, month=1)
+                else:
+                    cur = cur.replace(month=cur.month+1)
+        elif kind == 'week':
+            cur = cur - datetime.timedelta(days=cur.weekday())
+            while cur <= end:
+                periods.append(cur)
+                cur += datetime.timedelta(weeks=1)
+        elif kind == 'year':
+            while cur <= end:
+                periods.append(cur.replace(month=1))
+                cur = cur.replace(year=cur.year+1)
+        return periods
+
     # Orders by selectable range
     if orders_range == 'week':
         start = now - datetime.timedelta(weeks=12)
         trunc = TruncWeek('order_date')
         label_fmt = '%W %b %Y'
+        period_kind = 'week'
     elif orders_range == 'year':
         start = now - datetime.timedelta(days=365*5)
         trunc = TruncYear('order_date')
         label_fmt = '%Y'
+        period_kind = 'year'
     elif orders_range == 'all':
         start = Order.objects.earliest('order_date').order_date if Order.objects.exists() else now
         trunc = TruncYear('order_date')
         label_fmt = '%Y'
+        period_kind = 'year'
     else:  # month (last 6 months)
         start = now - datetime.timedelta(days=180)
         trunc = TruncMonth('order_date')
         label_fmt = '%b %Y'
+        period_kind = 'month'
+    end = now
+    all_periods = get_periods(start, end, period_kind)
     qs = (
         Order.objects.filter(order_date__gte=start)
         .annotate(period=trunc)
@@ -394,8 +422,9 @@ def admin_dashboard_charts(request):
         .annotate(total=Count('id'))
         .order_by('period')
     )
-    orders_by_labels = [g['period'].strftime(label_fmt) for g in qs]
-    orders_by_data = [g['total'] for g in qs]
+    period_map = {g['period'].strftime(label_fmt): g['total'] for g in qs if g['period']}
+    orders_by_labels = [p.strftime(label_fmt) for p in all_periods]
+    orders_by_data = [period_map.get(p.strftime(label_fmt), 0) for p in all_periods]
 
     # Products by category (pie)
     cat_labels = []
@@ -404,59 +433,80 @@ def admin_dashboard_charts(request):
         cat_labels.append(c.name)
         cat_counts.append(c.num)
 
-    # Products added by month (bar)
-    prod_months = []
-    prod_counts = []
+    # Products added by month (bar, always last 12 months)
+    prod_start = (now.replace(day=1) - datetime.timedelta(days=365)).replace(day=1)
+    prod_periods = get_periods(prod_start, now, 'month')
     prod_qs = (
-        Product.objects.filter(created_at__gte=now - datetime.timedelta(days=365))
+        Product.objects.filter(created_at__gte=prod_start)
         .annotate(month=TruncMonth('created_at'))
         .values('month')
         .annotate(total=Count('id'))
         .order_by('month')
     )
-    for g in prod_qs:
-        prod_months.append(g['month'].strftime('%b %Y'))
-        prod_counts.append(g['total'])
+    prod_map = {g['month'].strftime('%b %Y'): g['total'] for g in prod_qs if g['month']}
+    prod_months = [p.strftime('%b %Y') for p in prod_periods]
+    prod_counts = [prod_map.get(p, 0) for p in prod_months]
 
-    # Orders vs Products (comparison line)
+    # Orders vs Products (comparison line, same periods as orders_by)
     if mode == 'week':
         trunc_cmp = TruncWeek('order_date')
         trunc_cmp_prod = TruncWeek('created_at')
         label_fmt_cmp = '%W %b %Y'
-        cmp_start = now - datetime.timedelta(weeks=12)
+        cmp_kind = 'week'
     else:
         trunc_cmp = TruncMonth('order_date')
         trunc_cmp_prod = TruncMonth('created_at')
         label_fmt_cmp = '%b %Y'
-        cmp_start = now - datetime.timedelta(days=180)
+        cmp_kind = 'month'
+    cmp_periods = get_periods(start, end, cmp_kind)
     # Orders for comparison
     cmp_orders = (
-        Order.objects.filter(order_date__gte=cmp_start)
+        Order.objects.filter(order_date__gte=start)
         .annotate(period=trunc_cmp)
         .values('period')
         .annotate(total=Count('id'))
         .order_by('period')
     )
-    cmp_labels = [g['period'].strftime(label_fmt_cmp) for g in cmp_orders]
-    cmp_orders_data = [g['total'] for g in cmp_orders]
+    cmp_orders_map = {g['period'].strftime(label_fmt_cmp): g['total'] for g in cmp_orders if g['period']}
+    cmp_labels = [p.strftime(label_fmt_cmp) for p in cmp_periods]
+    cmp_orders_data = [cmp_orders_map.get(label, 0) for label in cmp_labels]
     # Products for comparison (by created_at)
     cmp_products = (
-        Product.objects.filter(created_at__gte=cmp_start)
+        Product.objects.filter(created_at__gte=start)
         .annotate(period=trunc_cmp_prod)
         .values('period')
         .annotate(total=Count('id'))
         .order_by('period')
     )
-    cmp_products_data = []
-    cmp_products_dict = {g['period'].strftime(label_fmt_cmp): g['total'] for g in cmp_products}
-    for label in cmp_labels:
-        cmp_products_data.append(cmp_products_dict.get(label, 0))
+    cmp_products_map = {g['period'].strftime(label_fmt_cmp): g['total'] for g in cmp_products if g['period']}
+    cmp_products_data = [cmp_products_map.get(label, 0) for label in cmp_labels]
+
+    # Orders by Retailer (top 5)
+    retailer_qs = (
+        Order.objects.values('retailer__name')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:5]
+    )
+    retailer_labels = [g['retailer__name'] or 'Unknown' for g in retailer_qs]
+    retailer_data = [g['total'] for g in retailer_qs]
+
+    # FIX: Products by Supplier (top 5) via Inventory
+    from .models import Inventory, Supplier
+    supplier_qs = (
+        Inventory.objects.values('supplier__name')
+        .annotate(total=Count('product', distinct=True))
+        .order_by('-total')[:5]
+    )
+    supplier_labels = [g['supplier__name'] or 'Unknown' for g in supplier_qs]
+    supplier_data = [g['total'] for g in supplier_qs]
 
     return JsonResponse({
         'orders_by': {'labels': orders_by_labels, 'data': orders_by_data},
         'products_by_category': {'labels': cat_labels, 'data': cat_counts},
         'products_by_month': {'labels': prod_months, 'data': prod_counts},
         'orders_vs_products': {'labels': cmp_labels, 'orders': cmp_orders_data, 'products': cmp_products_data},
+        'orders_by_retailer': {'labels': retailer_labels, 'data': retailer_data},
+        'products_by_supplier': {'labels': supplier_labels, 'data': supplier_data},
     })
 
 # Patch admin URLs to add chart endpoint
