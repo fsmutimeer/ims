@@ -161,6 +161,8 @@ from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
 import logging
 from django.db import connection
+from django.db.models import Count
+from .models import Product, Order, Category, Supplier, Retailer
 from .models import *
 
 logger = logging.getLogger(__name__)
@@ -333,6 +335,20 @@ class OrderDetailAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related('order', 'product')
 
 admin.site.register(User, CustomUserAdmin)
+
+# Patch admin index to add dashboard stats
+original_admin_index = admin.site.index
+
+def custom_admin_index(self, request, extra_context=None):
+    if extra_context is None:
+        extra_context = {}
+    extra_context['total_products'] = Product.objects.count()
+    extra_context['total_orders'] = Order.objects.count()
+    extra_context['total_categories'] = Category.objects.count()
+    extra_context['total_suppliers'] = Supplier.objects.count()
+    extra_context['total_retailers'] = Retailer.objects.count()
+    return original_admin_index(request, extra_context=extra_context)
+admin.site.index = custom_admin_index.__get__(admin.site)
 
 # Set custom admin site titles from settings
 from django.conf import settings

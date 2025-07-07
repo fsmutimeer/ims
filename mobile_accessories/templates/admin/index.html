@@ -1,0 +1,57 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block content %}
+<style>
+    .dashboard-cards {
+        display: flex;
+        gap: 2em;
+        margin-bottom: 2em;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px #e0e0e0;
+        padding: 1.5em 2em;
+        min-width: 180px;
+        text-align: center;
+        flex: 1 1 180px;
+    }
+
+    .dashboard-card h2 {
+        margin: 0 0 0.5em 0;
+        font-size: 2.2em;
+        color: #3366cc;
+    }
+
+    .dashboard-card p {
+        margin: 0;
+        color: #888;
+        font-size: 1.1em;
+    }
+</style>
+<div class="dashboard-cards">
+    <div class="dashboard-card">
+        <h2>{{ total_products }}</h2>
+        <p>Total Products</p>
+    </div>
+    <div class="dashboard-card">
+        <h2>{{ total_orders }}</h2>
+        <p>Total Orders</p>
+    </div>
+    <div class="dashboard-card">
+        <h2>{{ total_categories }}</h2>
+        <p>Total Categories</p>
+    </div>
+    <div class="dashboard-card">
+        <h2>{{ total_suppliers }}</h2>
+        <p>Total Suppliers</p>
+    </div>
+    <div class="dashboard-card">
+        <h2>{{ total_retailers }}</h2>
+        <p>Total Retailers</p>
+    </div>
+</div>
+{{ block.super }}
+{% endblock %}
