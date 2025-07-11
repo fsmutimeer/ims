@@ -115,6 +115,14 @@
         <h2>{{ total_inventory }}</h2>
         <p>Total Inventory Records</p>
     </div>
+    <div class="dashboard-card">
+        <h2>{{ total_revenue|floatformat:2 }}</h2>
+        <p>Total Revenue</p>
+    </div>
+    <div class="dashboard-card">
+        <h2>{{ total_profit|floatformat:2 }}</h2>
+        <p>Total Profit</p>
+    </div>
 </div>
 <div class="dashboard-graphs" style="margin-bottom:2em;">
     <div style="display:flex;gap:2em;flex-wrap:wrap;justify-content:center;">
@@ -157,6 +165,22 @@
             <canvas id="ordersVsProductsChart" width="800" height="320"></canvas>
         </div>
     </div>
+    <!-- Profit Chart -->
+    <div style="display:flex;justify-content:center;">
+        <div class="dashboard-graph" style="max-width:900px;width:100%;padding:1.2em 0.5em;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5em;">
+                <h3 style="margin:0;">Profit <span id="profitByLabel">by Month</span></h3>
+                <div>
+                    <label style="font-size:1.1em;">View:&nbsp;</label>
+                    <select id="profitByRange" style="font-size:1.1em;padding:4px 10px;">
+                        <option value="month" selected>By Month</option>
+                        <option value="year">By Year</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="profitByChart" width="800" height="320"></canvas>
+        </div>
+    </div>
     <div style="display:flex;gap:2em;flex-wrap:wrap;justify-content:center;">
         <div class="dashboard-graph" style="max-width:640px;min-width:400px;padding:2em 1em;">
             <h3>Orders by Retailer (Top 5)</h3>
@@ -170,8 +194,8 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
 <script>
-    let ordersVsProductsChart, ordersByChartObj, productsByMonthChartObj;
-    let ordersRange = 'month', comparisonMode = 'month';
+    let ordersVsProductsChart, ordersByChartObj, productsByMonthChartObj, profitByChartObj;
+    let ordersRange = 'month', comparisonMode = 'month', profitByRange = 'month';
     function getChartColors() {
         const isDark = document.body.classList.contains('dark-mode');
         return {
@@ -184,13 +208,14 @@
         const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.body.classList.toggle('dark-mode', isDark);
     }
-    function renderDashboardCharts({ ordersRange: or = ordersRange, comparisonMode: cm = comparisonMode } = {}) {
-        ordersRange = or; comparisonMode = cm;
+    function renderDashboardCharts({ ordersRange: or = ordersRange, comparisonMode: cm = comparisonMode, profitByRange: pr = profitByRange } = {}) {
+        ordersRange = or; comparisonMode = cm; profitByRange = pr;
         setBodyThemeClass();
         const chartColors = getChartColors();
         document.getElementById('ordersByLabel').textContent = {
             week: 'Week', month: 'Month (Last 6 Months)', year: 'Year', all: 'All Time'
         }[ordersRange] || 'Month (Last 6 Months)';
+        document.getElementById('profitByLabel').textContent = profitByRange === 'year' ? 'by Year' : 'by Month';
         fetch(`/admin/dashboard-charts/?orders_range=${ordersRange}&mode=${comparisonMode}`)
             .then(resp => resp.json())
             .then(data => {
@@ -298,6 +323,36 @@
                         }
                     }
                 });
+                // Profit by Month/Year (bar)
+                const ctxProfit = document.getElementById('profitByChart').getContext('2d');
+                if (profitByChartObj) profitByChartObj.destroy();
+                let profitData, profitLabels;
+                if (profitByRange === 'year') {
+                    profitLabels = data.profit_by_year.labels;
+                    profitData = data.profit_by_year.data;
+                } else {
+                    profitLabels = data.profit_by_month.labels;
+                    profitData = data.profit_by_month.data;
+                }
+                profitByChartObj = new Chart(ctxProfit, {
+                    type: 'bar',
+                    data: {
+                        labels: profitLabels,
+                        datasets: [{
+                            label: 'Profit',
+                            data: profitData,
+                            backgroundColor: '#ff4444',
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: chartColors.font }, grid: { color: chartColors.grid } },
+                            y: { ticks: { color: chartColors.font }, grid: { color: chartColors.grid } }
+                        }
+                    }
+                });
                 // Orders by Retailer (bar)
                 const ctx5 = document.getElementById('ordersByRetailerChart').getContext('2d');
                 if (window.ordersByRetailerChartObj) window.ordersByRetailerChartObj.destroy();
@@ -353,6 +408,10 @@
         });
         document.getElementById('comparisonMode').addEventListener('change', function (e) {
             comparisonMode = e.target.value;
+            renderDashboardCharts();
+        });
+        document.getElementById('profitByRange').addEventListener('change', function (e) {
+            profitByRange = e.target.value;
             renderDashboardCharts();
         });
     });

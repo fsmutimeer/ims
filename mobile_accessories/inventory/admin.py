@@ -1,156 +1,3 @@
-# from django.contrib import admin
-# from django.contrib.auth.admin import UserAdmin
-# from django.contrib.auth.forms import UserChangeForm
-# from django.contrib.auth import get_user_model
-# from django.utils.html import format_html
-# from .models import *
-
-# # Get the custom User model
-# User = get_user_model()
-
-# class CustomUserChangeForm(UserChangeForm):
-#     class Meta(UserChangeForm.Meta):
-#         model = User
-#         exclude = ('last_login',)  # Explicitly exclude non-editable field
-
-# class UserRoleInline(admin.TabularInline):
-#     model = UserRole
-#     extra = 1
-#     fk_name = 'user'  # Resolves multiple ForeignKey issue
-#     fields = ('role', 'additional_info')  # Only editable fields
-#     verbose_name = "User Role"
-#     verbose_name_plural = "User Roles"
-
-# class CustomUserAdmin(UserAdmin):
-#     form = CustomUserChangeForm
-#     inlines = [UserRoleInline]
-#     list_display = ('username', 'email', 'first_name', 'last_name', 'is_active', 'contact_number')
-#     list_filter = ('is_active', 'is_staff', 'is_superuser')
-#     search_fields = ('username', 'email', 'first_name', 'last_name')
-    
-#     # Updated fieldsets without last_login
-#     fieldsets = (
-#         (None, {'fields': ('username', 'password')}),
-#         ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'contact_number')}),
-#         ('Permissions', {
-#             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
-#         }),
-#         ('Important dates', {'fields': ('date_joined',)}),  # Removed last_login
-#     )
-    
-#     # Add fieldsets configuration
-#     add_fieldsets = (
-#         (None, {
-#             'classes': ('wide',),
-#             'fields': ('username', 'password1', 'password2', 'email', 'contact_number'),
-#         }),
-#     )
-    
-#     def save_formset(self, request, form, formset, change):
-#         instances = formset.save(commit=False)
-#         for instance in instances:
-#             if isinstance(instance, UserRole) and not instance.pk:
-#                 instance.created_by = request.user
-#             instance.save()
-#         formset.save_m2m()
-
-# class BaseAdmin(admin.ModelAdmin):
-#     """Base admin class with common functionality"""
-#     exclude = ('created_by',)
-#     readonly_fields = ('created_at',)
-    
-#     def save_model(self, request, obj, form, change):
-#         """Auto-set created_by to current user for new objects"""
-#         if not obj.pk and not obj.created_by and hasattr(obj, 'created_by'):
-#             obj.created_by = request.user
-#         super().save_model(request, obj, form, change)
-
-# @admin.register(Category)
-# class CategoryAdmin(BaseAdmin):
-#     list_display = ('name', 'description', 'created_at', 'created_by')
-#     search_fields = ('name', 'description')
-#     list_filter = ('created_at',)
-
-# @admin.register(Supplier)
-# class SupplierAdmin(BaseAdmin):
-#     list_display = ('name', 'contact_person', 'email', 'phone', 'created_at', 'created_by')
-#     search_fields = ('name', 'contact_person', 'email')
-#     list_filter = ('created_at',)
-
-# @admin.register(Product)
-# class ProductAdmin(BaseAdmin):
-#     list_display = ('name', 'category', 'sku', 'selling_price', 'current_stock_display', 'created_by')
-#     list_filter = ('category', 'created_at')
-#     search_fields = ('name', 'sku', 'barcode')
-    
-#     def current_stock_display(self, obj):
-#         inventory = obj.inventory_set.first()
-#         if inventory:
-#             stock = inventory.current_stock
-#             color = 'green' if stock > inventory.reorder_level else 'red'
-#             return format_html('<span style="color: {};">{}</span>', color, stock)
-#         return 0
-#     current_stock_display.short_description = 'Current Stock'
-    
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).prefetch_related('inventory_set')
-
-# @admin.register(Inventory)
-# class InventoryAdmin(BaseAdmin):
-#     list_display = ('product', 'supplier', 'current_stock', 'reorder_level', 'last_stock_update', 'updated_by')
-#     list_filter = ('supplier', 'last_stock_update')
-#     search_fields = ('product__name', 'product__sku')
-    
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).select_related('product', 'supplier', 'updated_by')
-
-# @admin.register(Retailer)
-# class RetailerAdmin(BaseAdmin):
-#     list_display = ('name', 'contact_person', 'email', 'phone', 'assigned_salesman', 'created_by')
-#     list_filter = ('assigned_salesman', 'created_at')
-#     search_fields = ('name', 'contact_person', 'email')
-    
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).select_related('assigned_salesman')
-
-# @admin.register(Order)
-# class OrderAdmin(BaseAdmin):
-#     list_display = ('id', 'retailer', 'order_date', 'colored_status', 'total_amount', 'salesman', 'processed_by')
-#     list_filter = ('status', 'order_date', 'payment_method')
-#     search_fields = ('retailer__name', 'id')
-    
-#     def colored_status(self, obj):
-#         colors = {
-#             'pending': 'orange',
-#             'processing': 'blue',
-#             'shipped': 'purple',
-#             'delivered': 'green',
-#             'cancelled': 'red',
-#             'returned': 'gray'
-#         }
-#         return format_html(
-#             '<span style="color: {};">{}</span>',
-#             colors.get(obj.status, 'black'),
-#             obj.get_status_display()
-#         )
-#     colored_status.short_description = 'Status'
-    
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).select_related(
-#             'retailer', 'salesman', 'processed_by'
-#         )
-
-# @admin.register(OrderDetail)
-# class OrderDetailAdmin(admin.ModelAdmin):
-#     list_display = ('order', 'product', 'quantity', 'unit_price', 'subtotal')
-#     search_fields = ('order__id', 'product__name')
-    
-#     def get_queryset(self, request):
-#         return super().get_queryset(request).select_related('order', 'product')
-
-# # Register User model with custom admin
-# admin.site.register(User, CustomUserAdmin)
-
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
@@ -161,9 +8,8 @@ from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
 import logging
 from django.db import connection
-from django.db.models import Count
-from .models import Product, Order, Category, Supplier, Retailer
-from .models import *
+from django.db.models import Count, F, Sum, ExpressionWrapper, DecimalField
+from .models import Product, Order, OrderDetail, Category, Supplier, Retailer, Inventory, UserRole
 from django.http import JsonResponse
 from django.urls import path
 from django.contrib.admin.views.decorators import staff_member_required
@@ -354,6 +200,18 @@ def custom_admin_index(self, request, extra_context=None):
     extra_context['total_suppliers'] = Supplier.objects.count()
     extra_context['total_retailers'] = Retailer.objects.count()
     extra_context['total_inventory'] = Inventory.objects.count()
+    # Add total revenue and profit
+    total_revenue = Order.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+    # Profit: sum((unit_price - product.cost_price) * quantity) for all order details
+    profit_qs = OrderDetail.objects.select_related('product').annotate(
+        profit=ExpressionWrapper(
+            (F('unit_price') - F('product__cost_price')) * F('quantity'),
+            output_field=DecimalField(max_digits=12, decimal_places=2)
+        )
+    )
+    total_profit = profit_qs.aggregate(total=Sum('profit'))['total'] or 0
+    extra_context['total_revenue'] = total_revenue
+    extra_context['total_profit'] = total_profit
     return original_admin_index(request, extra_context=extra_context)
 admin.site.index = custom_admin_index.__get__(admin.site)
 
@@ -365,7 +223,6 @@ admin.site.index_title = getattr(settings, 'ADMIN_INDEX_TITLE', 'Site administra
 
 @staff_member_required
 def admin_dashboard_charts(request):
-    from django.db.models.functions import TruncWeek, TruncMonth, TruncYear
     now = timezone.now()
     orders_range = request.GET.get('orders_range', 'month')
     mode = request.GET.get('mode', 'month')
@@ -491,7 +348,6 @@ def admin_dashboard_charts(request):
     retailer_data = [g['total'] for g in retailer_qs]
 
     # FIX: Products by Supplier (top 5) via Inventory
-    from .models import Inventory, Supplier
     supplier_qs = (
         Inventory.objects.values('supplier__name')
         .annotate(total=Count('product', distinct=True))
@@ -500,6 +356,55 @@ def admin_dashboard_charts(request):
     supplier_labels = [g['supplier__name'] or 'Unknown' for g in supplier_qs]
     supplier_data = [g['total'] for g in supplier_qs]
 
+    # Profit by month
+    profit_by_month_labels = prod_months  # Use same months as products_by_month
+    profit_by_month_data = []
+    for month_label in profit_by_month_labels:
+        # Get first day of month
+        try:
+            dt = datetime.datetime.strptime(month_label, '%b %Y')
+        except Exception:
+            profit_by_month_data.append(0)
+            continue
+        month_start = dt.replace(day=1)
+        if month_start.month == 12:
+            next_month = month_start.replace(year=month_start.year+1, month=1, day=1)
+        else:
+            next_month = month_start.replace(month=month_start.month+1, day=1)
+        order_ids = Order.objects.filter(order_date__gte=month_start, order_date__lt=next_month).values_list('id', flat=True)
+        profit_qs = OrderDetail.objects.filter(order_id__in=order_ids).select_related('product').annotate(
+            profit=ExpressionWrapper(
+                (F('unit_price') - F('product__cost_price')) * F('quantity'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        )
+        profit = profit_qs.aggregate(total=Sum('profit'))['total'] or 0
+        profit_by_month_data.append(float(profit))
+    # Profit by year
+    profit_by_year_labels = []
+    profit_by_year_data = []
+    years = set()
+    for month_label in prod_months:
+        try:
+            dt = datetime.datetime.strptime(month_label, '%b %Y')
+            years.add(dt.year)
+        except Exception:
+            continue
+    years = sorted(list(years))
+    for year in years:
+        year_start = datetime.datetime(year, 1, 1)
+        year_end = datetime.datetime(year+1, 1, 1)
+        order_ids = Order.objects.filter(order_date__gte=year_start, order_date__lt=year_end).values_list('id', flat=True)
+        profit_qs = OrderDetail.objects.filter(order_id__in=order_ids).select_related('product').annotate(
+            profit=ExpressionWrapper(
+                (F('unit_price') - F('product__cost_price')) * F('quantity'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        )
+        profit = profit_qs.aggregate(total=Sum('profit'))['total'] or 0
+        profit_by_year_labels.append(str(year))
+        profit_by_year_data.append(float(profit))
+
     return JsonResponse({
         'orders_by': {'labels': orders_by_labels, 'data': orders_by_data},
         'products_by_category': {'labels': cat_labels, 'data': cat_counts},
@@ -507,6 +412,8 @@ def admin_dashboard_charts(request):
         'orders_vs_products': {'labels': cmp_labels, 'orders': cmp_orders_data, 'products': cmp_products_data},
         'orders_by_retailer': {'labels': retailer_labels, 'data': retailer_data},
         'products_by_supplier': {'labels': supplier_labels, 'data': supplier_data},
+        'profit_by_month': {'labels': profit_by_month_labels, 'data': profit_by_month_data},
+        'profit_by_year': {'labels': profit_by_year_labels, 'data': profit_by_year_data},
     })
 
 # Patch admin URLs to add chart endpoint
