@@ -67,12 +67,12 @@ class CustomUserAdmin(UserAdmin):
 class BaseAdmin(admin.ModelAdmin):
     """Base admin class with common functionality"""
     exclude = ('created_by',)
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'created_by')
     
     def save_model(self, request, obj, form, change):
         """Auto-set created_by to current user for new objects"""
         try:
-            if not obj.pk and not obj.created_by and hasattr(obj, 'created_by'):
+            if not obj.pk and hasattr(obj, 'created_by'):
                 obj.created_by = request.user
             
             # Save the main object first
@@ -120,9 +120,11 @@ class InventoryAdmin(BaseAdmin):
     list_display = ('product', 'supplier', 'current_stock', 'reorder_level', 'last_stock_update', 'updated_by')
     list_filter = ('supplier', 'last_stock_update')
     search_fields = ('product__name', 'product__sku')
+    exclude = BaseAdmin.exclude + ('updated_by',)
+    readonly_fields = BaseAdmin.readonly_fields + ('updated_by',)
     
     def save_model(self, request, obj, form, change):
-        if not change:  # New inventory record
+        if not change and hasattr(obj, 'updated_by'):
             obj.updated_by = request.user
         super().save_model(request, obj, form, change)
     
@@ -143,9 +145,11 @@ class OrderAdmin(BaseAdmin):
     list_display = ('id', 'retailer', 'order_date', 'colored_status', 'total_amount', 'salesman', 'processed_by')
     list_filter = ('status', 'order_date', 'payment_method')
     search_fields = ('retailer__name', 'id')
+    exclude = BaseAdmin.exclude + ('processed_by',)
+    readonly_fields = BaseAdmin.readonly_fields + ('processed_by',)
     
     def save_model(self, request, obj, form, change):
-        if not change:  # New order
+        if not change and hasattr(obj, 'processed_by'):
             obj.processed_by = request.user
         super().save_model(request, obj, form, change)
     

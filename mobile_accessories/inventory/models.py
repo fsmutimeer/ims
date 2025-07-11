@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from decimal import Decimal
+from django.db.models import Manager
 
 class User(AbstractUser):
     contact_number = models.CharField(max_length=20)
@@ -168,20 +170,45 @@ class Order(BaseModel):
     def __str__(self):
         return f"Order #{self.id} - {self.retailer.name} ({self.get_status_display()})"
 
+class OrderDetailManager(Manager):
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Only include rows where unit_price, quantity, and subtotal are valid decimals
+        try:
+            from decimal import Decimal, InvalidOperation
+            valid = []
+            for od in qs:
+                try:
+                    Decimal(str(od.unit_price))
+                    Decimal(str(od.subtotal))
+                    int(od.quantity)
+                    valid.append(od.pk)
+                except (InvalidOperation, ValueError, TypeError):
+                    continue
+            return qs.filter(pk__in=valid)
+        except Exception:
+            return qs
+
 class OrderDetail(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+
+    objects = OrderDetailManager()
     
     def save(self, *args, **kwargs):
         is_new = not self.pk
         old_values = None
-        
         if not is_new:
             old = self.__class__.objects.get(pk=self.pk)
             old_values = {f.name: getattr(old, f.name) for f in self._meta.fields}
-        
-        self.subtotal = self.quantity * self.unit_price
+        # Ensure subtotal is always a Decimal
+        q = Decimal(str(self.quantity or 0))
+        up = self.unit_price if self.unit_price is not None else Decimal('0.00')
+        self.subtotal = q * up
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"OrderDetail: Order {self.order_id}, Product {self.product_id}, Qty {self.quantity}, Unit Price {self.unit_price}, Subtotal {self.subtotal}"
